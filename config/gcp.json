@@ -1,0 +1,10 @@
+{
+  "project_id": "jcdeah-009",
+  "bucket": "jcdeah-009-daud-finalproject",
+  "location": "asia-southeast2",
+  "storage_class": "STANDARD",
+  "local_auth": "user_adc_with_use_local_adc_flag",
+  "object_prefix": "final-project",
+  "bigquery_dataset": "daud_finalproject",
+  "jisdor_table": "fact_jisdor_daily"
+}

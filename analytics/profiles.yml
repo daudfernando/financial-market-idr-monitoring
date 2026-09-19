@@ -1,0 +1,21 @@
+daud_market:
+  target: demo
+  outputs:
+    demo:
+      type: bigquery
+      method: oauth
+      project: jcdeah-009
+      dataset: daud_finalproject_demo
+      location: asia-southeast2
+      threads: 2
+      maximum_bytes_billed: 104857600
+      job_execution_timeout_seconds: 120
+    cloud:
+      type: bigquery
+      method: oauth
+      project: jcdeah-009
+      dataset: daud_finalproject
+      location: asia-southeast2
+      threads: 2
+      maximum_bytes_billed: 104857600
+      job_execution_timeout_seconds: 120

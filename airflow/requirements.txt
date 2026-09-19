@@ -1,0 +1,4 @@
+curl_cffi==0.16.3
+google-cloud-storage==3.14.1
+google-cloud-bigquery==3.45.0
+pyspark==4.0.1

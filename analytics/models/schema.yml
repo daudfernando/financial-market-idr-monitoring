@@ -1,0 +1,52 @@
+version: 2
+models:
+  - name: mart_stock_monitoring
+    description: "Mart histori untuk Looker: nilai IDR, SMA3/SMA8, sinyal simulasi, dan return relatif tiga saham pembanding. Grain satu saham/mode/tipe/menit. Replay historis, bukan harga live."
+    columns:
+      - name: strategy_signal
+        description: "BUY/SELL saat SMA3 menyilang SMA8; HOLD tanpa silang; NO_SIGNAL bila riwayat atau FX belum cukup. Bukan hasil backtest."
+      - name: comparison_complete
+        description: "True bila empat saham tersedia pada menit sama dengan waktu awal sesi yang sama. Jika false, return pembanding/rank null."
+      - name: exposure_idr
+        description: "Nilai indikatif satu saham = price_usd x usd_idr. Bukan nilai portofolio."
+      - name: event_id
+        data_tests: [unique, not_null]
+  - name: mart_stock_latest
+    description: "Satu observasi terbaru per saham/mode/tipe berdasarkan waktu sumber. Untuk tabel ringkasan Looker, bukan harga live."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+  - name: stg_prices
+    description: "Deduplikasi event replay berdasarkan event_id. Memilih record dengan urutan ingestion terbaru dan metadata Kafka."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: price_usd
+        data_tests: [not_null]
+  - name: fact_market_exposure
+    description: "Gabungkan harga dengan kurs JISDOR yang memenuhi aturan waktu. Availability FX tidak diketahui: gunakan tanggal sebelum event WIB. Hitung valuasi satu saham."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: quantity
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1]
+                quote: false
+  - name: mart_market_risk
+    description: "Return dan kontribusi harga/FX/interaksi hanya antar-menit berurutan dalam sesi. Baseline 30 menit sebelumnya, minimal 20 return; abs(z-score)>=3 ditandai review_movement. Gap tidak diimputasi."
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: risk_indicator
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [insufficient_data, review_movement, within_demo_threshold]
+  - name: int_market_minutes
+    description: "Satu observasi per saham/mode/tipe/menit, tanggal WIB dan sesi New York. Harga bar historis adalah close dengan timestamp awal bar."
+  - name: int_stock_features
+    description: "SMA3/SMA8 memakai window waktu saat ini dan sebelumnya dalam sesi, tanpa harga masa depan. Hitung jumlah observasi dan return sejak awal sesi."
+  - name: demo_signal_scenarios
+    description: "Lima fixture sintetis terpisah menguji semua cabang rumus sinyal. Tidak digabung ke data harga asli atau mart monitoring."

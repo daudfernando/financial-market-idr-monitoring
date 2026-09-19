@@ -1,0 +1,63 @@
+version: 2
+unit_tests:
+  - name: fx_join_rejects_future_and_unknown_same_day
+    model: fact_market_exposure
+    given:
+      - input: ref('int_market_minutes')
+        rows:
+          - {event_id: first, symbol: JPM, currency: USD, price_usd: 100, event_timestamp: '2026-09-08 02:00:00+00:00', event_date_wib: '2026-09-08'}
+          - {event_id: second, symbol: JPM, currency: USD, price_usd: 100, event_timestamp: '2026-09-08 10:00:00+00:00', event_date_wib: '2026-09-08'}
+          - {event_id: missing, symbol: JPM, currency: USD, price_usd: 100, event_timestamp: '2026-09-01 02:00:00+00:00', event_date_wib: '2026-09-01'}
+          - {event_id: unknown_same_day, symbol: JPM, currency: USD, price_usd: 100, event_timestamp: '2026-09-09 10:00:00+00:00', event_date_wib: '2026-09-09'}
+      - input: source('raw', 'jisdor')
+        rows:
+          - {jisdor_date: '2026-09-07', currency: USD, usd_idr: 16000, fx_available_at: null, source_run_id: fixture}
+          - {jisdor_date: '2026-09-08', currency: USD, usd_idr: 16100, fx_available_at: '2026-09-08 09:00:00+00:00', source_run_id: fixture}
+          - {jisdor_date: '2026-09-09', currency: USD, usd_idr: 16200, fx_available_at: null, source_run_id: fixture}
+    expect:
+      rows:
+        - {event_id: first, usd_idr: 16000, exposure_idr: 1600000, fx_join_policy: prior_day_assumption}
+        - {event_id: second, usd_idr: 16100, exposure_idr: 1610000, fx_join_policy: verified_availability}
+        - {event_id: missing, usd_idr: null, exposure_idr: null, fx_join_policy: missing_fx}
+        - {event_id: unknown_same_day, usd_idr: 16100, exposure_idr: 1610000, fx_join_policy: verified_availability}
+  - name: contribution_math_and_session_boundary
+    model: mart_market_risk
+    given:
+      - input: ref('fact_market_exposure')
+        rows:
+          - {event_id: a, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-08', minute_utc: '2026-09-08 13:30:00+00:00', price_usd: 100, usd_idr: 16000, exposure_idr: 1600000}
+          - {event_id: b, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-08', minute_utc: '2026-09-08 13:31:00+00:00', price_usd: 101, usd_idr: 16010, exposure_idr: 1617010}
+          - {event_id: c, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-09', minute_utc: '2026-09-09 13:30:00+00:00', price_usd: 102, usd_idr: 16010, exposure_idr: 1633020}
+    expect:
+      rows:
+        - {event_id: a, asset_effect_idr: null, fx_effect_idr: null, interaction_effect_idr: null, total_change_idr: null, risk_indicator: insufficient_data}
+        - {event_id: b, asset_effect_idr: 16000, fx_effect_idr: 1000, interaction_effect_idr: 10, total_change_idr: 17010, risk_indicator: insufficient_data}
+        - {event_id: c, asset_effect_idr: null, fx_effect_idr: null, interaction_effect_idr: null, total_change_idr: null, risk_indicator: insufficient_data}
+
+  - name: sma_windows_use_only_current_and_past_minutes
+    model: int_stock_features
+    given:
+      - input: ref('mart_market_risk')
+        rows:
+          - {event_id: s0, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:30:00+00:00', price_usd: 8}
+          - {event_id: s1, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:31:00+00:00', price_usd: 8}
+          - {event_id: s2, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:32:00+00:00', price_usd: 8}
+          - {event_id: s3, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:33:00+00:00', price_usd: 8}
+          - {event_id: s4, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:34:00+00:00', price_usd: 8}
+          - {event_id: s5, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:35:00+00:00', price_usd: 8}
+          - {event_id: s6, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:36:00+00:00', price_usd: 8}
+          - {event_id: s7, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:37:00+00:00', price_usd: 8}
+          - {event_id: s8, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:38:00+00:00', price_usd: 11}
+          - {event_id: s9, symbol: JPM, ingestion_mode: replay, record_type: historical_bar, session_date: '2026-09-10', minute_utc: '2026-09-10 13:39:00+00:00', price_usd: 2}
+    expect:
+      rows:
+        - {event_id: s0, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 1}
+        - {event_id: s1, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 2}
+        - {event_id: s2, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 3}
+        - {event_id: s3, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 4}
+        - {event_id: s4, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 5}
+        - {event_id: s5, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 6}
+        - {event_id: s6, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 7}
+        - {event_id: s7, moving_average_short: 8, moving_average_long: 8, ma_observation_count: 8}
+        - {event_id: s8, moving_average_short: 9, moving_average_long: 8.375, ma_observation_count: 8}
+        - {event_id: s9, moving_average_short: 7, moving_average_long: 7.625, ma_observation_count: 8}

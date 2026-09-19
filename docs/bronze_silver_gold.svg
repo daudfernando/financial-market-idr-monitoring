@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="830" viewBox="0 0 1500 830" role="img" aria-labelledby="title desc">
+<title id="title">Medallion Architecture - Bronze, Silver, Gold</title>
+<desc id="desc">Pemetaan logis pipeline JISDOR dan replay saham: raw menuju data bersih, lalu mart analitik untuk Looker Studio.</desc>
+<defs>
+ <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#426052"/></marker>
+ <style>text{font-family:Segoe UI,Arial,sans-serif;fill:#1c352b}.title{font-size:32px;font-weight:700}.head{font-size:26px;font-weight:700}.body{font-size:19px}.small{font-size:16px;fill:#496052}.box{fill:white;stroke:#cad5cd;stroke-width:1.5}.line{fill:none;stroke:#426052;stroke-width:2.5;marker-end:url(#arrow)}</style>
+</defs>
+<rect width="1500" height="830" fill="#f5f7f2"/>
+<text x="45" y="58" class="title">Medallion Architecture</text>
+<text x="45" y="92" class="body">JISDOR batch + replay saham | Pemetaan layer logis pada pipeline yang sudah berjalan</text>
+<rect x="40" y="130" width="425" height="560" rx="18" fill="#f2e3d4"/>
+<rect x="535" y="130" width="425" height="560" rx="18" fill="#e4e9ed"/>
+<rect x="1030" y="130" width="425" height="560" rx="18" fill="#f7ecc5"/>
+<text x="65" y="175" class="head">BRONZE</text><text x="65" y="207" class="body">Sumber asli / raw</text>
+<text x="560" y="175" class="head">SILVER</text><text x="560" y="207" class="body">Bersih / valid / terstandar</text>
+<text x="1055" y="175" class="head">GOLD</text><text x="1055" y="207" class="body">Analitik bisnis / mart</text>
+<rect x="65" y="240" width="375" height="110" rx="10" class="box"/>
+<text x="85" y="275" class="body">XML asli JISDOR Bank Indonesia</text>
+<text x="85" y="308" class="small">GCS: final-project/raw/jisdor/</text>
+<rect x="65" y="400" width="375" height="165" rx="10" class="box"/>
+<text x="85" y="434" class="body">CSV asli saham dari yfinance</text>
+<text x="85" y="464" class="small">Arsip lokal per run pengambilan</text>
+<text x="85" y="505" class="body">Pesan Kafka raw</text>
+<text x="85" y="535" class="small">GCS: raw.jsonl / objek per pesan</text>
+<text x="65" y="617" class="small">Harga/waktu sumber dipertahankan.</text>
+<text x="65" y="644" class="small">Raw disimpan untuk audit dan replay.</text>
+<rect x="560" y="240" width="375" height="110" rx="10" class="box"/>
+<text x="580" y="275" class="body">fact_jisdor_daily</text>
+<text x="580" y="306" class="small">Spark → GCS processed → MERGE BQ</text>
+<text x="580" y="332" class="small">Grain: tanggal + mata uang</text>
+<rect x="560" y="400" width="375" height="165" rx="10" class="box"/>
+<text x="580" y="432" class="body">stg_market_replay_demo</text>
+<text x="580" y="469" class="body">↓ stg_prices (deduplikasi)</text>
+<text x="580" y="506" class="body">↓ int_market_minutes</text>
+<text x="580" y="539" class="small">Grain: saham / mode / tipe / menit</text>
+<text x="560" y="617" class="small">Python: validasi event; dbt: standarisasi.</text>
+<text x="560" y="644" class="small">Gap tidak diisi dengan angka buatan.</text>
+<rect x="1055" y="240" width="375" height="195" rx="10" class="box"/>
+<text x="1075" y="276" class="body">fact_market_exposure</text>
+<text x="1075" y="307" class="small">Harga + kurs → nilai satu saham IDR</text>
+<text x="1075" y="350" class="body">↓ mart_market_risk</text>
+<text x="1075" y="389" class="body">↓ int_stock_features</text>
+<rect x="1055" y="468" width="375" height="97" rx="10" class="box"/>
+<text x="1075" y="503" class="body">mart_stock_monitoring</text>
+<text x="1075" y="539" class="body">↓ mart_stock_latest</text>
+<path d="M1242 565V595" class="line"/>
+<rect x="1055" y="600" width="375" height="58" rx="10" fill="#184e3c"/>
+<text x="1242" y="637" text-anchor="middle" style="fill:white;font-size:23px;font-weight:700">Looker Studio</text>
+<path d="M440 290H554" class="line"/><path d="M440 480H554" class="line"/>
+<path d="M935 290H1049" class="line"/><path d="M935 480H990V330H1049" class="line"/>
+<path d="M1242 435V462" class="line"/>
+<text x="45" y="739" class="body">Nama pola: Medallion Architecture — bukan star schema atau tiga dataset fisik baru.</text>
+<text x="45" y="774" class="small">Demo per pesan memiliki staging terpisah; fixture sintetis tidak dimasukkan ke mart pasar asli.</text>
+<text x="45" y="803" class="small">Nama relasi mengikuti proyek saat ini. Diagram menyederhanakan detail orkestrasi dan transport.</text>
+</svg>

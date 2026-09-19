@@ -1,0 +1,11 @@
+name: daud_market
+version: '1.0.0'
+config-version: 2
+profile: daud_market
+model-paths: [models]
+test-paths: [tests]
+models:
+  daud_market:
+    +materialized: view
+vars:
+  market_table: stg_market_events

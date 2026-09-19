@@ -1,0 +1,75 @@
+name: daud-finalproject
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?Run scripts/prepare_airflow.py first}
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U airflow"]
+      interval: 5s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - mailpit-data:/data
+  airflow:
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    command: standalone
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: daud:admin
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: /opt/airflow/state/simple_auth_manager_passwords.json
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@postgres/airflow
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?Run scripts/prepare_airflow.py first}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://localhost:8080/execution/
+      AIRFLOW__CORE__PARALLELISM: "2"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/gcp/adc.json
+      GOOGLE_CLOUD_PROJECT: jcdeah-009
+      GCS_BUCKET: jcdeah-009-daud-finalproject
+      PYTHONPATH: /workspace/scripts
+      ALERT_SMTP_HOST: mailpit
+      ALERT_SMTP_PORT: "1025"
+      ALERT_EMAIL_TO: daud@localhost
+      PROJECT_ROOT: /workspace
+      SPARK_LOCAL_IP: "127.0.0.1"
+      PYSPARK_PYTHON: /usr/python/bin/python3.12
+      WRITE_PROGRESS_LOG: "0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./sql:/workspace/sql:ro
+      - ./data:/workspace/data
+      - ./logs:/workspace/logs
+      - ./data/airflow-state:/opt/airflow/state
+      - airflow-logs:/opt/airflow/logs
+      - type: bind
+        source: ${GCP_ADC_PATH:?Run scripts/prepare_airflow.py first}
+        target: /opt/airflow/gcp/adc.json
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:8085:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+volumes:
+  airflow-postgres:
+  airflow-logs:
+  mailpit-data:

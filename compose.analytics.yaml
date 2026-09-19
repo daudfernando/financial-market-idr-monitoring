@@ -1,0 +1,27 @@
+services:
+  dbt:
+    profiles: [analytics]
+    image: daud-finalproject-dbt:latest
+    build: ./analytics
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /workspace/gcp/adc.json
+      GOOGLE_CLOUD_PROJECT: jcdeah-009
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    volumes:
+      - ./analytics:/workspace/analytics:ro
+      - ./data:/workspace/data
+      - type: bind
+        source: ${GCP_ADC_PATH:?Run scripts/prepare_airflow.py first}
+        target: /workspace/gcp/adc.json
+        read_only: true
+        bind:
+          create_host_path: false
+  dbt-docs:
+    profiles: [analytics]
+    image: daud-finalproject-dbt:latest
+    entrypoint: [python]
+    command: [-m, http.server, "8080", --directory, /site]
+    ports:
+      - "127.0.0.1:8086:8080"
+    volumes:
+      - ./data/dbt/site:/site:ro

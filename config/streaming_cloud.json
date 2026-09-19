@@ -1,0 +1,18 @@
+{
+  "project_id": "jcdeah-009",
+  "region": "asia-southeast2",
+  "zone": "asia-southeast2-a",
+  "network": "daud-market",
+  "subnet": "daud-market-jakarta",
+  "subnet_cidr": "10.90.0.0/24",
+  "broker_vm": "daud-market-kafka",
+  "broker_ip": "10.90.0.10",
+  "broker_port": 9092,
+  "worker_service_account": "daud-dataflow-worker@jcdeah-009.iam.gserviceaccount.com",
+  "bucket": "jcdeah-009-daud-finalproject",
+  "dataset": "daud_finalproject",
+  "table": "stg_market_events",
+  "topic": "market.prices.replay.v1",
+  "max_workers": 1,
+  "broker_max_run_seconds": 7200
+}

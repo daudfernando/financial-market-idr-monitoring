@@ -1,0 +1,4 @@
+*
+!airflow/
+!airflow/Dockerfile
+!airflow/requirements.txt

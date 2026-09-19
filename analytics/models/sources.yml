@@ -1,0 +1,13 @@
+version: 2
+sources:
+  - name: raw
+    description: "Dua input BigQuery: batch kurs dari Airflow/Spark dan replay saham dari Kafka/Python melalui GCS."
+    database: jcdeah-009
+    schema: daud_finalproject
+    tables:
+      - name: jisdor
+        description: "Kurs JISDOR harian BI, raw XML -> GCS -> Spark -> processed per tanggal -> BigQuery MERGE."
+        identifier: fact_jisdor_daily
+      - name: market
+        description: "Snapshot histori asli JPM/BAC/GS/MS. Producer -> Kafka -> Python validasi -> GCS -> BigQuery. Mode replay; bukan live."
+        identifier: "{{ var('market_table') }}"
