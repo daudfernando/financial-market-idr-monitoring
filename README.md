@@ -16,7 +16,7 @@ Pipeline menggabungkan harga saham finansial dalam USD dengan kurs BI JISDOR unt
 
 | Bagian | Hasil |
 |---|---|
-| Batch JISDOR | 30 tanggal, 6 Agustus?18 September 2026 |
+| Batch JISDOR | 30 tanggal, 6 Agustus sampai 18 September 2026 |
 | Snapshot saham | 7.797 bar JPM/BAC/GS/MS, sesi 14 sampai 18 September 2026 |
 | Model dan tests | 8 view dbt; 21 data tests + 3 unit tests lulus |
 | Rekonsiliasi snapshot | Missing/mismatch/duplikasi 0; pasangan FX kosong 0 |
