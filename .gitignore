@@ -16,3 +16,17 @@ config/current_market_replay.json
 *.key
 *credentials*.json
 *passwords*.json
+
+# Local presentation materials and internal notes
+internal/
+docs/gamma_prompt_10_slides.txt
+docs/narasi_presentasi_final.md
+docs/panduan_demo_project.txt
+docs/presentation_40_minutes.md
+docs/final_project_checkpoint.pptx
+docs/project_history.md
+docs/guideline_readiness.md
+scripts/build_checkpoint_slides.py
+docs/*prompt*
+docs/*narasi*
+docs/*presentation*

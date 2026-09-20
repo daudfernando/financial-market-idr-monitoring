@@ -2,7 +2,7 @@
 
 Nama pola pengorganisasian data proyek ini adalah **Medallion Architecture**: data dipisahkan menurut tingkat pengolahannya, dari raw, menjadi bersih, lalu siap analisis. Pemetaan ini bersifat logis terhadap pipeline yang sudah berjalan; bukan tiga dataset baru dan bukan implementasi Delta Lake.
 
-Diagram untuk presentasi: [bronze_silver_gold.svg](bronze_silver_gold.svg).
+Diagram layer: [bronze_silver_gold.svg](bronze_silver_gold.svg).
 
 ## Bronze — raw dan bukti sumber
 
@@ -90,8 +90,6 @@ Diagram menyederhanakan orkestrasi dan transport; data processed GCS terdapat di
 - `demo_signal_scenarios` adalah fixture sintetis pengujian, bukan data pasar Bronze/Silver/Gold.
 - `jisdor_date_coverage` adalah view audit tanggal, bukan dimensi bisnis baru.
 
-## Kalimat untuk presentasi
-
-"Proyek ini menggunakan pembagian logis Medallion Architecture. Bronze menyimpan sumber asli, Silver menstandarkan dan memvalidasi data, sedangkan Gold menggabungkan harga dan kurs menjadi mart untuk dashboard."
+## Jenis pemodelan
 
 Medallion adalah **arsitektur lapisan pengolahan**, bukan nama skema relasional. Proyek ini memakai analytical marts dengan grain yang jelas; belum merupakan star schema lengkap karena belum memiliki tabel dimensi terpisah seperti `dim_stock` atau `dim_date`.

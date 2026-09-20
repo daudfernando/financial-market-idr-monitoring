@@ -4,16 +4,13 @@ Final Project Data Engineering ? Purwadhika JCDEAH-009 ? Daud Fernando.
 
 Pipeline menggabungkan harga saham finansial dalam USD dengan kurs BI JISDOR untuk memantau nilai indikatif rupiah, membandingkan return, dan menjelaskan sinyal simulasi. Pengguna yang dibayangkan adalah analis treasury/market risk; tidak ada klaim kepemilikan institusi atau penghematan bisnis yang sudah diukur.
 
-## Materi submission
+## Dokumentasi
 
-- [Prompt Gamma: tepat 10 slide, 16:9](docs/gamma_prompt_10_slides.txt)
-- [Narasi presentasi dan demo 40 menit](docs/narasi_presentasi_final.md)
-- [Diagram Bronze?Silver?Gold](docs/bronze_silver_gold.svg)
+- [Diagram Bronze, Silver, Gold](docs/bronze_silver_gold.svg)
 - [Penjelasan model dan grain data](docs/medallion_bronze_silver_gold.md)
-- [Panduan lengkap command dan query](docs/panduan_demo_project.txt)
+- [Pipeline batch BigQuery](docs/bigquery_batch.md)
+- [Transformasi dan mart analitik](docs/demo_analytics.md)
 - [Rumus sinyal dan kolom dashboard](docs/stock_signals.md)
-
-Prompt Gamma dan narasi adalah materi final terbaru. Berkas `docs/final_project_checkpoint.pptx` adalah draft lima slide checkpoint sebelumnya, bukan slide final 10 halaman. Hasil ekspor Gamma perlu ditinjau ukuran/overflow sebelum dikumpulkan.
 
 ## Status terverifikasi ? 19 September 2026
 
@@ -77,14 +74,14 @@ docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml
 
 `prepare_demo.cmd` mengambil histori baru, membuat arsip/kandidat aktif, menjalankan DAG batch dengan audit tanggal, lalu replay lengkap sampai mart/dashboard. Fresh clone tidak berisi data sumber: unduhan diperlukan. Docker/image build hanya diperlukan pada setup awal/perubahan dependencies.
 
-Persiapan D-1 pada lingkungan yang sudah siap:
+Memperbarui data dan membuka dokumentasi model:
 
 ```powershell
 .\prepare_demo.cmd
 .\dbt_docs.cmd
 ```
 
-Saat demo streaming:
+Menjalankan replay per pesan:
 
 ```powershell
 .\run_streaming_demo.cmd --limit 40 --interval 2
@@ -94,7 +91,7 @@ Saat demo streaming:
 
 Batch: buka Airflow, DAG `jisdor_daily`, Trigger DAG atau tunggu jadwal 18:00 WIB saat layanan hidup. Enam task: collect ? upload_raw ? transform_spark ? upload ? warehouse ? check_dates. MERGE memakai tanggal + mata uang. Cakupan pengambilan 45 hari; gap lebih lama memerlukan backfill terpisah.
 
-## Link demo
+## Akses layanan
 
 - Airflow lokal: http://localhost:8085
 - dbt Docs lokal: http://localhost:8086 (`.\dbt_docs.cmd`)
@@ -117,17 +114,17 @@ Link localhost membutuhkan layanan pada laptop sendiri; link GCP membutuhkan izi
 | analytics | dbt models, sources, macro dan tests |
 | sql | MERGE batch |
 | dashboard | HTML/JS/CSS; data hasil ekspor dibuat lokal |
-| docs | Prompt, narasi, diagram, runbook dan riwayat |
+| docs | Dokumentasi pipeline, diagram, model dan validasi data |
 | tests | Pengujian offline/integrasi komponen |
 | deployment | Eksperimen Dataflow lama; bukan jalur final |
 
 ## Data dan batas reproduksi
 
-Credential, `.env.airflow`, password, logs, folder data, ekspor Excel/data dashboard dan config replay runtime tidak diunggah. Snapshot diunduh/dibuat ulang oleh pipeline; tanggal sumber mengikuti ketersediaan Yahoo/BI. Histori minute tidak dijamin tersedia tanpa batas, sehingga data tanggal tertentu pada presentasi belum tentu bisa diunduh lagi kemudian.
+Credential, `.env.airflow`, password, logs, folder data, ekspor Excel/data dashboard dan config replay runtime tidak diunggah. Snapshot diunduh/dibuat ulang oleh pipeline; tanggal sumber mengikuti ketersediaan Yahoo/BI. Histori minute tidak dijamin tersedia tanpa batas, sehingga data pada tanggal tertentu belum tentu bisa diunduh lagi kemudian.
 
 Data harga tidak diubah untuk membuat sinyal seimbang. Gap tidak diimputasi; NO_SIGNAL/null dapat menjadi hasil yang benar. Umur FX dan kebijakan join disertakan. InsertId BigQuery bersifat best effort; view demo melakukan deduplikasi per run/event, bukan klaim exactly-once lintas sink.
 
-Dokumen lama menyimpan angka checkpoint terdahulu; utamakan status README dan narasi final. Publikasi kode tidak memindahkan hak atas data pihak ketiga.
+Publikasi kode tidak memindahkan hak atas data pihak ketiga.
 
 ## Sumber
 

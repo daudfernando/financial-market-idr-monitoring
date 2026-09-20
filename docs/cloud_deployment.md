@@ -23,12 +23,6 @@ Bukti pemeriksaan tersimpan di `data/deployment_checks/`. Pemeriksaan tidak dapa
 .venv\Scripts\python.exe scripts\cloud_streaming_preflight.py --use-local-adc
 ```
 
-## Pesan yang bisa dikirim ke mentor/admin
-
-> Pak/Bu, pipeline batch sudah berjalan sampai BigQuery. Untuk streaming, Kafka lokal dan Apache Beam sudah berhasil memproses replay 100 bar JPM asli. Saya ingin melanjutkan Kafka + Dataflow di project jcdeah-009. Akun saya sudah bisa membuat dan menghentikan job Dataflow, tetapi belum bisa membuat VM, jaringan/firewall, atau service account. Apakah bisa dibantu provisioning broker dan worker identity sesuai deployment/admin_plan.sh, atau diberikan broker existing yang dapat diakses Dataflow? Saya tidak membutuhkan role Owner. Script default hanya menampilkan command untuk direview. Kebutuhannya satu VM Kafka e2-medium di Jakarta dan satu worker Dataflow, dengan Kafka pada IP privat. Saya juga membutuhkan actAs pada service account worker dan akses IAP/OS Login terbatas ke VM demo. Job Dataflow akan di-drain setelah validasi; broker direncanakan auto-stop setelah dua jam.
-
-Pesan ini hanya disiapkan sebagai teks; belum dikirim ke siapa pun.
-
 ## Rencana resource untuk admin
 
 Konfigurasi non-secret: `config/streaming_cloud.json`. Nama dan IP pada script provisioning serta launcher mengikuti konfigurasi ini; jika memakai resource existing, sesuaikan **ketiganya** sebelum menjalankan.

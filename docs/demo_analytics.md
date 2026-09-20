@@ -74,11 +74,11 @@ Source input dikonfigurasi dengan `market_table`. Target default `demo` mengguna
 
 ## Looker Studio dan kebutuhan eksternal
 
-Dashboard HTML sudah tersedia untuk demo. **Report Looker Studio belum dibuat.** Jika mentor mewajibkan Looker Studio, pilih konektor BigQuery, project `jcdeah-009`, dataset `daud_finalproject_demo`, view `mart_stock_monitoring` (atau `mart_stock_latest` untuk tabel status terakhir):
+Dashboard HTML sudah tersedia untuk demo. **Report Looker Studio belum dibuat.** Untuk menghubungkan Looker Studio, pilih konektor BigQuery, project `jcdeah-009`, dataset `daud_finalproject_demo`, view `mart_stock_monitoring` (atau `mart_stock_latest` untuk tabel status terakhir):
 
 - Time series 1: dimension `minute_utc`, metric `exposure_idr`, filter satu symbol/mode.
 - Time series 2: dimension `minute_utc`, metric `usd_idr`.
 - Table: `session_date`, `symbol`, `risk_indicator`, `baseline_count`, `fx_age_calendar_days`.
 - Gunakan AVG atau MAX pada grain satu symbol/menit, bukan SUM harga. Selalu tampilkan mode replay, quantity=1, dan tanggal snapshot.
 
-Report harus diuji dan dibagikan melalui akun pengguna; URL report belum tersedia. Repository GitHub dan slide yang dibagikan juga belum dipublikasikan dari workspace ini.
+Report harus diuji dan dibagikan melalui akun pengguna; URL report belum tersedia.
