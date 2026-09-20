@@ -26,30 +26,30 @@
 <text x="65" y="644" class="small">Raw disimpan untuk audit dan replay.</text>
 <rect x="560" y="240" width="375" height="110" rx="10" class="box"/>
 <text x="580" y="275" class="body">fact_jisdor_daily</text>
-<text x="580" y="306" class="small">Spark → GCS processed → MERGE BQ</text>
+<text x="580" y="306" class="small">Spark, GCS processed, MERGE BQ</text>
 <text x="580" y="332" class="small">Grain: tanggal + mata uang</text>
 <rect x="560" y="400" width="375" height="165" rx="10" class="box"/>
 <text x="580" y="432" class="body">stg_market_replay_demo</text>
-<text x="580" y="469" class="body">↓ stg_prices (deduplikasi)</text>
-<text x="580" y="506" class="body">↓ int_market_minutes</text>
+<text x="580" y="469" class="body">stg_prices (deduplikasi)</text>
+<text x="580" y="506" class="body">int_market_minutes</text>
 <text x="580" y="539" class="small">Grain: saham / mode / tipe / menit</text>
 <text x="560" y="617" class="small">Python: validasi event; dbt: standarisasi.</text>
 <text x="560" y="644" class="small">Gap tidak diisi dengan angka buatan.</text>
 <rect x="1055" y="240" width="375" height="195" rx="10" class="box"/>
 <text x="1075" y="276" class="body">fact_market_exposure</text>
-<text x="1075" y="307" class="small">Harga + kurs → nilai satu saham IDR</text>
-<text x="1075" y="350" class="body">↓ mart_market_risk</text>
-<text x="1075" y="389" class="body">↓ int_stock_features</text>
+<text x="1075" y="307" class="small">Harga + kurs, nilai satu saham IDR</text>
+<text x="1075" y="350" class="body">mart_market_risk</text>
+<text x="1075" y="389" class="body">int_stock_features</text>
 <rect x="1055" y="468" width="375" height="97" rx="10" class="box"/>
 <text x="1075" y="503" class="body">mart_stock_monitoring</text>
-<text x="1075" y="539" class="body">↓ mart_stock_latest</text>
+<text x="1075" y="539" class="body">mart_stock_latest</text>
 <path d="M1242 565V595" class="line"/>
 <rect x="1055" y="600" width="375" height="58" rx="10" fill="#184e3c"/>
 <text x="1242" y="637" text-anchor="middle" style="fill:white;font-size:23px;font-weight:700">Looker Studio</text>
 <path d="M440 290H554" class="line"/><path d="M440 480H554" class="line"/>
 <path d="M935 290H1049" class="line"/><path d="M935 480H990V330H1049" class="line"/>
 <path d="M1242 435V462" class="line"/>
-<text x="45" y="739" class="body">Nama pola: Medallion Architecture — bukan star schema atau tiga dataset fisik baru.</text>
+<text x="45" y="739" class="body">Nama pola: Medallion Architecture, bukan star schema atau tiga dataset fisik baru.</text>
 <text x="45" y="774" class="small">Demo per pesan memiliki staging terpisah; fixture sintetis tidak dimasukkan ke mart pasar asli.</text>
 <text x="45" y="803" class="small">Nama relasi mengikuti proyek saat ini. Diagram menyederhanakan detail orkestrasi dan transport.</text>
 </svg>

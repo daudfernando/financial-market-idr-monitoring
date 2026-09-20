@@ -43,7 +43,7 @@ Tabel demo menggunakan WRITE_TRUNCATE agar rerun tidak menumpuk snapshot. Raw GC
 
 ## Hasil terverifikasi
 
-Snapshot terbaru: 7.788 bar, empat saham, lima sesi 10?16 September 2026. Rekonsiliasi Kafka/Python/BigQuery cocok seluruhnya; FX kosong nol. Delapan view, 21 data tests, dan tiga unit tests lulus. Ada 103 observasi review_movement, bukan ukuran akurasi deteksi.
+Snapshot terbaru: 7.788 bar, empat saham, lima sesi 10 sampai 16 September 2026. Rekonsiliasi Kafka/Python/BigQuery cocok seluruhnya; FX kosong nol. Delapan view, 21 data tests, dan tiga unit tests lulus. Ada 103 observasi review_movement, bukan ukuran akurasi deteksi.
 
 Detail rumus, distribusi sinyal, tabel Looker Studio, dan bukti: [stock_signals.md](stock_signals.md).
 
@@ -53,7 +53,7 @@ Detail rumus, distribusi sinyal, tabel Looker Studio, dan bukti: [stock_signals.
 2. Deduplikasi memakai event ID sumber yang stabil. Jika ada beberapa observasi per menit, model memilih observasi terakhir dengan urutan deterministik.
 3. `fx_available_at` yang terverifikasi harus <= waktu event. Jika null, hanya kurs bertanggal **sebelum tanggal event WIB** yang dipakai. Ini asumsi konservatif, bukan bukti waktu publikasi historis; revisi historis sumber masih mungkin terjadi.
 4. Quantity selalu satu saham. Tidak ada klaim posisi, laba terealisasi, kerugian institusi, atau ROI operasional.
-5. Kontribusi pada mart memakai pasangan menit berurutan dalam sesi yang sama. Gap dan overnight menghasilkan null. Kontribusi dashboard membandingkan awal–akhir pilihan dan dapat mencakup overnight; label grafik menjelaskan pembandingnya.
+5. Kontribusi pada mart memakai pasangan menit berurutan dalam sesi yang sama. Gap dan overnight menghasilkan null. Kontribusi dashboard membandingkan awal-akhir pilihan dan dapat mencakup overnight; label grafik menjelaskan pembandingnya.
 6. Baseline z-score memakai return pada 30 menit sebelumnya, tanpa observasi saat ini, minimal 20 return; baseline dipisahkan per sesi. Ambang 3 belum dikalibrasi. Corporate action/stock split belum dinormalisasi untuk analisis jangka panjang.
 7. Dashboard adalah snapshot ekspor, bukan live refresh. Perbarui melalui command demo. Grafik memakai urutan observasi; jarak waktu antar-sesi tidak ditampilkan secara proporsional.
 

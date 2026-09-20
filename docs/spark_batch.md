@@ -30,7 +30,7 @@ docker compose --env-file .env.airflow exec -T airflow airflow tasks states-for-
 
 ## Verifikasi 16 September 2026
 
-Run Airflow `spark_validation_20260916` berhasil untuk semua lima task. Sumber `20260916T112208364096Z` menghasilkan 14 record valid melalui Spark. BigQuery memiliki 19 tanggal unik (20 Agustus–16 September), duplikasi 0, invalid 0, dan batch mismatch 0.
+Run Airflow `spark_validation_20260916` berhasil untuk semua lima task. Sumber `20260916T112208364096Z` menghasilkan 14 record valid melalui Spark. BigQuery memiliki 19 tanggal unik (20 Agustus-16 September), duplikasi 0, invalid 0, dan batch mismatch 0.
 
 - Bukti Spark: `data/source_samples/20260916T112208364096Z/spark_report.json`.
 - Bukti warehouse: `logs/bigquery_batch_20260916T112234102450Z.json`.

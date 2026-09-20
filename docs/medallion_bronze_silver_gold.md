@@ -1,10 +1,10 @@
-# Medallion Architecture — Bronze, Silver, Gold
+# Medallion Architecture, Bronze, Silver, Gold
 
 Nama pola pengorganisasian data proyek ini adalah **Medallion Architecture**: data dipisahkan menurut tingkat pengolahannya, dari raw, menjadi bersih, lalu siap analisis. Pemetaan ini bersifat logis terhadap pipeline yang sudah berjalan; bukan tiga dataset baru dan bukan implementasi Delta Lake.
 
 Diagram layer: [bronze_silver_gold.svg](bronze_silver_gold.svg).
 
-## Bronze — raw dan bukti sumber
+## Bronze, raw dan bukti sumber
 
 Tujuan: menyimpan data asli agar dapat diaudit dan diproses ulang.
 
@@ -17,7 +17,7 @@ Tujuan: menyimpan data asli agar dapat diaudit dan diproses ulang.
 
 XML/CSV asli tidak ditimpa untuk membuat tampilan bersih. File kandidat replay sudah merupakan hasil pemilihan kolom dan normalisasi waktu dari CSV, sehingga bukan salinan raw murni. Kafka adalah transport/log pesan, bukan nama layer penyimpanan tersendiri.
 
-## Silver — bersih, tervalidasi, terstandar
+## Silver, bersih, tervalidasi, terstandar
 
 Tujuan: menghasilkan data konsisten yang dapat digabungkan dan dihitung.
 
@@ -32,7 +32,7 @@ Tujuan: menghasilkan data konsisten yang dapat digabungkan dan dihitung.
 
 Kurs invalid atau key batch duplikat menggagalkan publikasi. Harga asli dipertahankan; gap tidak diisi angka buatan. Nama `fact_jisdor_daily` tidak otomatis menjadikannya Gold: pada pemetaan ini perannya adalah sumber kurs bersih bagi analitik.
 
-## Gold — analitik bisnis dan mart dashboard
+## Gold, analitik bisnis dan mart dashboard
 
 Tujuan: menyediakan jawaban atas perubahan harga, nilai rupiah, sinyal, dan perbandingan saham.
 
