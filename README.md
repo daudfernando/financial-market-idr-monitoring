@@ -9,6 +9,7 @@ Pipeline menggabungkan harga saham finansial dalam USD dengan kurs BI JISDOR unt
 - [Diagram Bronze, Silver, Gold](docs/bronze_silver_gold.svg)
 - [Penjelasan model dan grain data](docs/medallion_bronze_silver_gold.md)
 - [Pipeline batch BigQuery](docs/bigquery_batch.md)
+- [Streaming Kafka, demo per pesan dan ingestion Google Cloud](docs/streaming_ingestion.md)
 - [Transformasi dan mart analitik](docs/demo_analytics.md)
 - [Rumus sinyal dan kolom dashboard](docs/stock_signals.md)
 
@@ -81,7 +82,7 @@ Memperbarui data dan membuka dokumentasi model:
 .\dbt_docs.cmd
 ```
 
-Menjalankan replay per pesan:
+Menjalankan replay per pesan. [Panduan streaming](docs/streaming_ingestion.md) menjelaskan output terminal, pesan Kafka, raw GCS, dan query pertambahan baris BigQuery:
 
 ```powershell
 .\run_streaming_demo.cmd --limit 40 --interval 2
