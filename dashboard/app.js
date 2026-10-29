@@ -3,7 +3,7 @@ const D = window.PROJECT_DATA;
 const $ = id => document.getElementById(id);
 const num = (v, digits=0) => v == null ? 'Tidak tersedia' : Number(v).toLocaleString('id-ID', {maximumFractionDigits:digits});
 const idr = v => v == null ? 'Tidak tersedia' : 'Rp ' + num(v);
-if (!D || !D.rows.length) { document.body.textContent = 'Snapshot belum tersedia. Jalankan scripts/export_dashboard.py.'; }
+if (!D || !D.rows.length) { document.body.textContent = 'Snapshot belum tersedia. Jalankan: python jalankan.py ekspor-dashboard --use-local-adc'; }
 else {
   const symbols = [...new Set(D.rows.map(r => r.symbol))];
   for (const s of symbols) $('symbol').add(new Option(s,s));

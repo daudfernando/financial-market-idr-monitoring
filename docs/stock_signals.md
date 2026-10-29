@@ -1,73 +1,57 @@
 # Sinyal simulasi dan tabel dashboard
 
-Snapshot terverifikasi 17 September 2026: 7.788 bar asli JPM, BAC, GS, MS dari Yahoo melalui yfinance. Rentang bersama 10 September 13:30 UTC sampai 16 September 19:59 UTC; lima sesi New York. Data diputar ulang melalui Kafka lokal, diproses Python consumer per event, disimpan GCS, lalu dimuat ke BigQuery dan ditransformasikan dbt. Ini replay historis, bukan harga live atau bukti eksekusi Dataflow cloud.
+Pipeline menghitung sinyal pada histori menit JPM, BAC, GS, dan MS. Data berasal dari Yahoo Finance melalui yfinance, kemudian diputar ulang melalui Kafka. Hasilnya bukan harga live, rekomendasi investasi, atau bukti profit.
 
-## Aturan yang dapat dijelaskan
+## Aturan sinyal
 
-Versi `sma_3_8_crossover_v1`. SMA3 adalah rata-rata harga penutupan tiga menit terakhir, SMA8 delapan menit terakhir, termasuk menit saat ini. Window dipisahkan per saham dan sesi. Parameter pendek dipilih untuk demonstrasi pembelajaran; belum dioptimalkan atau diuji sebagai strategi keuntungan.
+Versi aturan: `sma_3_8_crossover_v1`. SMA3 dan SMA8 memakai harga saat ini serta bar sebelumnya dalam saham dan sesi yang sama.
 
-| Sinyal | Aturan |
+| Sinyal | Kondisi |
 |---|---|
-| BUY | SMA3 sebelumnya <= SMA8 sebelumnya, dan SMA3 sekarang > SMA8 sekarang |
-| SELL | SMA3 sebelumnya >= SMA8 sebelumnya, dan SMA3 sekarang < SMA8 sekarang |
-| HOLD | Tidak ada persilangan baru, termasuk rata-rata yang sama |
-| NO_SIGNAL | Window delapan menit saat ini/sebelumnya belum lengkap, menit tidak berurutan, atau FX tidak tersedia |
+| BUY | SMA3 sebelumnya tidak di atas SMA8, lalu SMA3 sekarang menembus ke atas SMA8 |
+| SELL | SMA3 sebelumnya tidak di bawah SMA8, lalu SMA3 sekarang menembus ke bawah SMA8 |
+| HOLD | Window lengkap tetapi tidak ada persilangan baru |
+| NO_SIGNAL | Histori belum cukup, menit tidak berurutan, atau kurs belum tersedia |
 
-Sinyal pertama paling cepat pada bar ke-9 sesi. Gap membuat sinyal tidak tersedia sampai kedua window kembali lengkap. Tidak memakai harga masa depan. Untuk bar historis, `signal_available_at` adalah awal bar + satu menit karena harga close baru diketahui setelah bar selesai. Waktu ini adalah waktu teoretis ketersediaan sinyal historis, bukan waktu penerimaan replay.
+Sinyal pertama paling cepat muncul pada bar kesembilan. `signal_available_at` adalah akhir bar historis, sehingga rumus tidak memakai harga masa depan. SELL berarti simulasi keluar, bukan short order; HOLD berarti tidak ada aksi baru.
 
-SELL merupakan simulasi sinyal keluar, bukan perintah short. HOLD berarti tidak ada aksi baru, bukan bukti memiliki posisi. Belum ada simulasi kepemilikan, biaya transaksi, atau backtest keuntungan. FX menjadi syarat kelengkapan valuasi; arah crossover dihitung dari harga USD.
+## Model BigQuery
 
-## Hasil aktual dari data asli
+Dataset: `jcdeah-009.daud_finalproject_demo`, lokasi `asia-southeast2`.
 
-| Saham | BUY | SELL | HOLD | NO_SIGNAL | Total |
-|---|---:|---:|---:|---:|---:|
-| JPM | 139 | 137 | 1.634 | 40 | 1.950 |
-| BAC | 137 | 137 | 1.636 | 40 | 1.950 |
-| GS | 123 | 117 | 1.580 | 119 | 1.939 |
-| MS | 131 | 131 | 1.639 | 48 | 1.949 |
-| Total | 530 | 522 | 6.489 | 247 | 7.788 |
-
-Label mengikuti rumus, tanpa memaksa jumlah BUY/SELL/HOLD. Empat bar terbaru kebetulan semuanya HOLD; gunakan histori untuk melihat variasi. Lima skenario sintetis terpisah menguji cross up, cross down, tren berlanjut, rata-rata sama, dan riwayat kurang dengan macro SQL yang sama. Skenario tidak dimasukkan ke tabel harga asli.
-
-## Sumber BigQuery untuk Looker Studio
-
-Project `jcdeah-009`, dataset `daud_finalproject_demo`, lokasi `asia-southeast2`. Berikut adalah **view BigQuery** yang dapat langsung dipilih oleh konektor:
-
-| View | Penggunaan |
+| View | Grain dan penggunaan |
 |---|---|
-| `mart_stock_monitoring` | 7.788 baris histori: grafik harga, SMA, nilai IDR, sinyal, dan perbandingan |
-| `mart_stock_latest` | Empat baris terbaru berdasarkan waktu sumber: kartu/status per saham |
-| `demo_signal_scenarios` | Lima contoh sintetis untuk menjelaskan rumus, tampilkan di halaman simulasi terpisah |
+| `mart_stock_monitoring` | Satu saham per menit, untuk histori harga, SMA, nilai IDR, sinyal, dan perbandingan peer |
+| `mart_stock_latest` | Satu baris terbaru per saham, untuk kartu status |
+| `demo_signal_scenarios` | Lima skenario sintetis yang hanya menguji rumus |
 
-Kolom utama: `symbol`, `institution_name`, `minute_utc`, `session_date`, `price_usd`, `usd_idr`, `exposure_idr`, `moving_average_short`, `moving_average_long`, `strategy_signal`, `signal_reason`, `signal_rule_version`, `signal_available_at`, `data_status`, `data_kind`, `last_updated_at`.
+Kolom utama: `symbol`, `company_name`, `minute_utc`, `session_date`, `price_usd`, `usd_idr`, `exposure_idr`, `moving_average_short`, `moving_average_long`, `strategy_signal`, `signal_reason`, `session_return`, `peer_average_return`, `excess_return_vs_peers`, dan `peer_rank`.
 
-Perbandingan menggunakan `session_return = price_usd / session_first_price - 1`. `peer_average_return` adalah rata-rata return tiga saham lainnya pada menit yang sama. `excess_return_vs_peers` adalah return saham dikurangi rata-rata tersebut. `peer_rank` mengurutkan return terbesar; nilai seri dapat memiliki peringkat sama. Benchmark ini kelompok pembanding proyek, bukan indeks pasar resmi.
+`comparison_complete` bernilai true hanya ketika empat saham tersedia pada menit dan awal sesi yang konsisten. Harga yang hilang tidak diimputasi. Format return sebagai persen dan jangan menjumlahkan harga, SMA, atau kurs.
 
-`comparison_complete` hanya true ketika empat saham tersedia dengan waktu awal sesi yang sama. GS kehilangan 11 menit dan MS satu menit; harga tidak diisi perkiraan. Ada 36 baris tersedia pada menit yang perbandingannya tidak lengkap; return pembanding dan rank dibuat null. `aligned_with_latest` pada view latest menunjukkan apakah waktu saham sejajar dengan menit terbaru seluruh kelompok.
+## Query distribusi aktual
 
-Rekomendasi komponen dashboard:
+Jumlah berubah ketika snapshot diperbarui, sehingga dokumentasi tidak mengunci angka lama.
 
-- Tabel latest: saham, harga USD, nilai IDR, sinyal, alasan, return sesi, return pembanding, rank, dan waktu sumber.
-- Grafik dari monitoring: `minute_utc` sebagai waktu, harga/SMA3/SMA8 sebagai metrik; filter satu saham dan sesi.
-- Distribusi sinyal: dimensi `strategy_signal`, metrik jumlah baris. Label sebagai jumlah sinyal, bukan jumlah transaksi.
-- Format return sebagai persen (nilai 0,01 berarti 1%). Harga/SMA/kurs menggunakan AVG atau MAX pada grain satu saham/menit, bukan SUM.
-- Tampilkan mode replay dan tanggal sumber. `last_updated_at` adalah waktu ingestion, bukan bukti harga pasar saat ini.
-
-## Mengulang dan memeriksa
-
-```bat
-cd /d "C:\Purwadhika\Final Project"
-run_demo.cmd
+```sql
+SELECT symbol, strategy_signal, COUNT(*) AS jumlah
+FROM `jcdeah-009.daud_finalproject_demo.mart_stock_monitoring`
+GROUP BY symbol, strategy_signal
+ORDER BY symbol, strategy_signal;
 ```
 
-Input ditentukan `config/current_market_replay.json`. Untuk mengulang dari capture yang sudah valid:
+## Menjalankan ulang
 
-```bat
-run_demo.cmd --source-run-id 20260917T123103782750Z
+```powershell
+Set-Location "C:\Purwadhika\Final Project"
+.\.venv\Scripts\python.exe jalankan.py replay-lengkap
+.\.venv\Scripts\python.exe jalankan.py periksa-mart --use-local-adc
 ```
 
-Build terverifikasi: delapan view, 21 data tests, tiga unit tests; seluruhnya lulus. Rekonsiliasi 7.788 Kafka/Python/BigQuery records cocok tanpa duplikasi atau mismatch; FX kosong nol. Metadata unduhan: `data/market_universe/20260917T121614070331Z/report.json`. Bukti build: `data/dbt/target/run_results.json`.
+Untuk memakai capture Kafka yang sudah lulus validasi:
 
-Pengambilan data baru tersedia melalui `scripts/collect_market_universe.py` di environment yang memiliki yfinance. Setelah report berstatus passed, arahkan path dan jumlah records di `config/current_market_replay.json` ke hasil baru sebelum menjalankan replay. Jumlah dan distribusi sinyal dapat berubah pada snapshot berikutnya.
+```powershell
+.\.venv\Scripts\python.exe jalankan.py replay-lengkap --source-run-id SOURCE_RUN_ID
+```
 
-Dataflow tidak digunakan pada jalur final. Dashboard Looker Studio dapat dibuat sekarang menggunakan view demo; report Looker belum dibuat oleh pipeline ini.
+Bukti build tersimpan lokal di `data/dbt/target/run_results.json`. Dashboard Looker Studio menggunakan dua mart di atas; report Looker tidak dibuat otomatis oleh pipeline.

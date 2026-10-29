@@ -1,0 +1,29 @@
+dag_id: jisdor_daily
+schedule: '0 18 * * *'
+timezone: Asia/Jakarta
+project: jcdeah-009
+bucket: jcdeah-009-daud-finalproject
+tasks:
+  - task_id: collect
+    proses: ambil-kurs
+    parameter: ['--lookback-days', '45']
+  - task_id: upload_raw
+    proses: simpan-kurs
+    parameter: ['--source-dir', 'data/source_samples/{run_id}', '--project', '{project}', '--bucket', '{bucket}', '--raw-only', '--upload']
+    depends_on: [collect]
+  - task_id: transform_spark
+    proses: bersihkan-kurs
+    parameter: ['--run-id', '{run_id}', '--project', '{project}', '--bucket', '{bucket}']
+    depends_on: [upload_raw]
+  - task_id: upload
+    proses: simpan-kurs
+    parameter: ['--source-dir', 'data/source_samples/{run_id}', '--project', '{project}', '--bucket', '{bucket}', '--upload']
+    depends_on: [transform_spark]
+  - task_id: warehouse
+    proses: muat-kurs
+    parameter: ['--run-id', '{run_id}', '--project', '{project}', '--bucket', '{bucket}']
+    depends_on: [upload]
+  - task_id: check_dates
+    proses: periksa-kurs
+    parameter: ['--source-run-id', '{run_id}']
+    depends_on: [warehouse]

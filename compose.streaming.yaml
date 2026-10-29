@@ -42,19 +42,22 @@ services:
   market:
     profiles: [streaming]
     build: ./streaming
-    command: ["producer.py", "--help"]
+    command: ["-m", "scripts.streaming.kirim_event", "--help"]
+    working_dir: /workspace
     environment:
+      PYTHONPATH: /workspace
       KAFKA_BOOTSTRAP_SERVERS: kafka:19092
       GOOGLE_APPLICATION_CREDENTIALS: /workspace/gcp/adc.json
       GOOGLE_CLOUD_PROJECT: jcdeah-009
     volumes:
-      - ./streaming:/workspace/streaming:ro
+      - ./scripts:/workspace/scripts:ro
+      - ./operator_pipeline:/workspace/operator_pipeline:ro
+      - ./jalankan.py:/workspace/jalankan.py:ro
       - ./data:/workspace/data
       - ./tests:/workspace/tests:ro
-      - ./deployment:/workspace/deployment:ro
       - ./config:/workspace/config:ro
       - type: bind
-        source: ${GCP_ADC_PATH:?Run scripts/prepare_airflow.py first}
+        source: ${GCP_ADC_PATH:?Run python jalankan.py siapkan-airflow first}
         target: /workspace/gcp/adc.json
         read_only: true
         bind:

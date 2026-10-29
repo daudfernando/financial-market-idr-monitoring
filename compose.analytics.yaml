@@ -11,7 +11,7 @@ services:
       - ./analytics:/workspace/analytics:ro
       - ./data:/workspace/data
       - type: bind
-        source: ${GCP_ADC_PATH:?Run scripts/prepare_airflow.py first}
+        source: ${GCP_ADC_PATH:?Run python jalankan.py siapkan-airflow first}
         target: /workspace/gcp/adc.json
         read_only: true
         bind:

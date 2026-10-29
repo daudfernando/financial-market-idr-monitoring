@@ -1,135 +1,137 @@
 # Financial Market & IDR Exposure Monitoring
 
-Final Project Data Engineering, Purwadhika JCDEAH-009, Daud Fernando.
+Portofolio Data Engineering, Daud Fernando, Purwadhika JCDEAH-009.
 
-Pipeline menggabungkan harga saham finansial dalam USD dengan kurs BI JISDOR untuk memantau nilai indikatif rupiah, membandingkan return, dan menjelaskan sinyal simulasi. Pengguna yang dibayangkan adalah analis treasury/market risk; tidak ada klaim kepemilikan institusi atau penghematan bisnis yang sudah diukur.
+Pipeline menggabungkan histori empat saham finansial AS dengan kurs BI JISDOR untuk memantau nilai indikatif dalam rupiah. Pengguna analitik dapat membandingkan saham, melihat pengaruh harga dan kurs, serta menelusuri asal angka di dashboard.
 
-## Dokumentasi
+## Cakupan data
 
-- [Diagram Bronze, Silver, Gold](docs/bronze_silver_gold.svg)
-- [Penjelasan model dan grain data](docs/medallion_bronze_silver_gold.md)
-- [Pipeline batch BigQuery](docs/bigquery_batch.md)
-- [Streaming Kafka, demo per pesan dan ingestion Google Cloud](docs/streaming_ingestion.md)
-- [Transformasi dan mart analitik](docs/demo_analytics.md)
-- [Rumus sinyal dan kolom dashboard](docs/stock_signals.md)
+| Data | Sumber dan grain | Kegunaan |
+|---|---|---|
+| Kurs USD/IDR | BI JISDOR, tanggal dan mata uang | Konversi nilai ke rupiah |
+| JPM, BAC, GS, MS | Yahoo Finance melalui yfinance, bar satu menit | Histori harga dan perbandingan saham |
+| Referensi saham | Daftar manual empat emiten, satu baris per symbol | Nama perusahaan dan mata uang |
+| Mart analitik | Harga, kurs dan dimensi saham | Nilai per saham, return dan sinyal simulasi |
 
-## Status terverifikasi, 19 September 2026
+Harga menggunakan histori asli yang dikirim ulang melalui Kafka. Ini bukan feed harga live. Quantity satu saham; sinyal SMA3/SMA8 adalah simulasi aturan, bukan hasil backtest atau rekomendasi investasi. Ketersediaan tanggal mengikuti sumber, termasuk akhir pekan dan hari libur.
 
-| Bagian | Hasil |
-|---|---|
-| Batch JISDOR | 30 tanggal, 6 Agustus sampai 18 September 2026 |
-| Snapshot saham | 7.797 bar JPM/BAC/GS/MS, sesi 14 sampai 18 September 2026 |
-| Model dan tests | 8 view dbt; 21 data tests + 3 unit tests lulus |
-| Rekonsiliasi snapshot | Missing/mismatch/duplikasi 0; pasangan FX kosong 0 |
-| Streaming per pesan | Kafka, Python, raw GCS, streaming insert BigQuery; read-back diuji |
-| Alert | Email pengujian di Mailpit lokal |
-| Dashboard | HTML lokal siap; sumber mart BigQuery siap untuk Looker |
-
-Data sumber historis asli; pengiriman saham adalah replay. Sinyal SMA3/SMA8 merupakan simulasi aturan, belum hasil backtest keuntungan. Quantity selalu satu saham. Snapshot setelah refresh dapat berbeda dari angka ini.
-
-URL report Looker Studio belum diberikan. Repository ini tidak mengklaim report Looker telah selesai atau dibagikan.
-
-## Alur dan teknologi
+## Alur
 
 ```mermaid
 flowchart LR
-  BI[BI JISDOR] --> A[Airflow + Python]
-  A --> RAW[GCS raw XML]
-  RAW --> SP[Spark]
-  SP --> GP[GCS processed harian]
-  GP --> FX[BigQuery fact_jisdor_daily]
-  Y[Yahoo histori] --> P[Python producer]
-  P --> K[Kafka lokal]
-  K --> C[Python consumer]
-  C --> G[GCS raw + valid]
-  G --> ST[BigQuery snapshot saham]
+  BI[BI JISDOR] --> B[Airflow atau manual, YAML yang sama]
+  B --> G[GCS raw]
+  G --> S[Spark]
+  S --> P[GCS processed]
+  P --> FX[BigQuery fact_jisdor_daily]
+  Y[Yahoo histori] --> K[Python producer, Kafka, consumer]
+  K --> R[GCS raw dan valid]
+  R --> ST[BigQuery snapshot saham]
+  K --> E[GCS raw per event, BigQuery tabel demo]
   FX --> D[dbt]
   ST --> D
-  D --> M[Mart monitoring + latest]
-  M --> L[Looker / dashboard HTML]
-  C -. demo per pesan .-> B[BigQuery demo_streaming_events]
+  DIM[dim_saham] --> D
+  D --> M[Mart monitoring dan latest]
+  M --> L[Looker atau dashboard HTML]
+  B -. gagal .-> MAIL[Mailpit lokal]
 ```
 
-Airflow menjadwalkan batch; Spark menstandarkan kurs; Kafka menyimpan event/offset; Python memvalidasi event; GCS menyimpan bukti; BigQuery menyimpan data; dbt membangun model dan tests. Docker/Compose menjalankan layanan lokal, PostgreSQL menyimpan metadata Airflow. Dataflow/PubSub tidak dipakai pada jalur final.
+Replay snapshot memuat GCS setelah seluruh pesan selesai, lalu dbt membangun mart. Demo per event melakukan streaming insert ke tabel terpisah; tabel tersebut tidak otomatis memperbarui mart dashboard.
 
-Dua mode replay berbeda:
+![Arsitektur pipeline](docs/arsitektur_project_icons.png)
 
-- `run_demo.cmd`: snapshot lengkap dimuat dari GCS setelah replay selesai, lalu dbt dan ekspor dashboard.
-- `run_streaming_demo.cmd`: pesan dimasukkan ke tabel demo terpisah satu per satu; tidak otomatis memperbarui mart/chart utama.
+## Struktur
 
-Medallion merupakan pemetaan logis, bukan star schema lengkap atau tiga dataset fisik baru.
+```text
+jalankan.py                     satu entry point command
+config/pipeline_kurs.yaml        task ID, parameter, dependensi dan jadwal
+operator_pipeline/              operator Airflow, eksekusi, koneksi, GCS, BigQuery, alert
+scripts/
+  ekstraksi/                    ambil kurs dan histori saham
+  transformasi/                 bersihkan kurs dengan Spark
+  pemuatan/                     simpan sumber dan muat warehouse
+  streaming/                    kontrak event, producer, consumer dan replay
+  pipeline/                     orkestrasi persiapan dan replay lengkap
+  validasi/                     rekonsiliasi, cakupan tanggal dan mart
+  persiapan/                    konfigurasi lokal dan bucket
+  laporan/                      ekspor dashboard, Excel dan dbt Docs
+analytics/models/               silver, dimensi, gold dan pengujian dbt
+airflow/                        DAG dan image Spark
+```
 
-## Menjalankan di Windows PowerShell
+Semua task kurs menggunakan `OperatorKurs`; fungsi bisnis tidak ditulis ulang di DAG. Nama model BigQuery dipertahankan agar koneksi dashboard tetap kompatibel.
 
-Prasyarat: Docker Desktop (Linux containers), Python/environment sesuai requirements, Google Cloud CLI, user ADC yang memiliki akses ke resource proyek. Kode cloud dikonfigurasi untuk `jcdeah-009`, bucket `jcdeah-009-daud-finalproject`, region `asia-southeast2`; pengguna lain perlu akses atau menyesuaikan konfigurasi/referensi proyek. Repository ini tidak memberikan akses GCP publik.
+## Setup, Windows PowerShell
+
+Prasyarat: Python 3.11 atau lebih baru, Docker Desktop dengan Linux containers, Google Cloud CLI dan akses GCS/BigQuery pada project yang dikonfigurasi. Spark dijalankan dalam container Airflow. Resource cloud memakai `jcdeah-009`, region `asia-southeast2`; repository publik tidak memberikan izin mengakses project tersebut.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 gcloud auth application-default login
-.\.venv\Scripts\python.exe scripts\prepare_airflow.py
-.\.venv\Scripts\python.exe scripts\compose.py build airflow
-docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml -f compose.analytics.yaml --profile streaming --profile analytics build market dbt
-.\prepare_demo.cmd
+.\.venv\Scripts\python.exe jalankan.py siapkan-airflow
+docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml -f compose.analytics.yaml --profile streaming --profile analytics build airflow market dbt
+docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml -f compose.analytics.yaml --profile streaming --profile analytics up -d --wait airflow kafka
 ```
 
-`prepare_demo.cmd` mengambil histori baru, membuat arsip/kandidat aktif, menjalankan DAG batch dengan audit tanggal, lalu replay lengkap sampai mart/dashboard. Fresh clone tidak berisi data sumber: unduhan diperlukan. Docker/image build hanya diperlukan pada setup awal/perubahan dependencies.
+Jika bucket belum tersedia, buat dengan `jalankan.py siapkan-bucket --project jcdeah-009 --bucket jcdeah-009-daud-finalproject --use-local-adc`. Periksa izin dan konfigurasi sebelum menggunakan project milik sendiri. `.env.airflow` dan credential dibuat/disimpan lokal, bukan di Git.
 
-Memperbarui data dan membuka dokumentasi model:
+## Menjalankan pipeline
 
-```powershell
-.\prepare_demo.cmd
-.\dbt_docs.cmd
-```
-
-Menjalankan replay per pesan. [Panduan streaming](docs/streaming_ingestion.md) menjelaskan output terminal, pesan Kafka, raw GCS, dan query pertambahan baris BigQuery:
-
-```powershell
-.\run_streaming_demo.cmd --limit 40 --interval 2
-# PowerShell kedua setelah minimal tiga pesan terkirim:
-.\show_kafka.cmd
-```
-
-Batch: buka Airflow, DAG `jisdor_daily`, Trigger DAG atau tunggu jadwal 18:00 WIB saat layanan hidup. Enam task: collect, upload_raw, transform_spark, upload, warehouse, check_dates. MERGE memakai tanggal + mata uang. Cakupan pengambilan 45 hari; gap lebih lama memerlukan backfill terpisah.
-
-## Akses layanan
-
-- Airflow lokal: http://localhost:8085
-- dbt Docs lokal: http://localhost:8086 (`.\dbt_docs.cmd`)
-- Mailpit lokal: http://localhost:8025
-- [BigQuery editor](https://console.cloud.google.com/bigquery?project=jcdeah-009)
-- [Mart monitoring](https://console.cloud.google.com/bigquery?project=jcdeah-009&p=jcdeah-009&d=daud_finalproject_demo&t=mart_stock_monitoring&page=table)
-- [Mart latest](https://console.cloud.google.com/bigquery?project=jcdeah-009&p=jcdeah-009&d=daud_finalproject_demo&t=mart_stock_latest&page=table)
-- [Streaming per pesan](https://console.cloud.google.com/bigquery?project=jcdeah-009&p=jcdeah-009&d=daud_finalproject_demo&t=demo_streaming_events&page=table)
-- [Audit tanggal JISDOR](https://console.cloud.google.com/bigquery?project=jcdeah-009&p=jcdeah-009&d=daud_finalproject&t=jisdor_date_coverage&page=table)
-
-Link localhost membutuhkan layanan pada laptop sendiri; link GCP membutuhkan izin. Password Airflow dibuat lokal oleh setup dan tidak dipublikasikan.
-
-## Struktur repository
-
-| Folder | Isi |
+| Tujuan | Command PowerShell |
 |---|---|
-| airflow | DAG dan image Airflow/Spark |
-| streaming | Producer, consumer, demo per pesan |
-| scripts | Collection, validasi, publication, refresh, dokumentasi |
-| analytics | dbt models, sources, macro dan tests |
-| sql | MERGE batch |
-| dashboard | HTML/JS/CSS; data hasil ekspor dibuat lokal |
-| docs | Dokumentasi pipeline, diagram, model dan validasi data |
-| tests | Pengujian offline/integrasi komponen |
-| deployment | Eksperimen Dataflow lama; bukan jalur final |
+| Perbarui sumber sampai mart | `.\.venv\Scripts\python.exe jalankan.py siapkan-data` |
+| Hanya perbarui arsip saham | `.\.venv\Scripts\python.exe jalankan.py ambil-saham --activate` |
+| Replay lengkap sampai mart | `.\.venv\Scripts\python.exe jalankan.py replay-lengkap` |
+| Batch manual di container Spark | `docker compose --env-file .env.airflow -f compose.yaml exec -T airflow python jalankan.py batch` |
+| Baca tiga pesan Kafka | `.\.venv\Scripts\python.exe jalankan.py lihat-kafka` |
+| Audit mart | `.\.venv\Scripts\python.exe jalankan.py periksa-mart --use-local-adc` |
+| Dokumentasi lineage | `.\.venv\Scripts\python.exe jalankan.py lihat-lineage --refresh` |
 
-## Data dan batas reproduksi
+Jalankan satu persiapan pada satu waktu. `siapkan-data` mengambil sumber, menunggu DAG batch sukses, lalu menjalankan replay dan dbt. Pipeline berhenti jika tahap wajib gagal.
 
-Credential, `.env.airflow`, password, logs, folder data, ekspor Excel/data dashboard dan config replay runtime tidak diunggah. Snapshot diunduh/dibuat ulang oleh pipeline; tanggal sumber mengikuti ketersediaan Yahoo/BI. Histori minute tidak dijamin tersedia tanpa batas, sehingga data pada tanggal tertentu belum tentu bisa diunduh lagi kemudian.
+Replay per event, setelah setup data awal selesai:
 
-Data harga tidak diubah untuk membuat sinyal seimbang. Gap tidak diimputasi; NO_SIGNAL/null dapat menjadi hasil yang benar. Umur FX dan kebijakan join disertakan. InsertId BigQuery bersifat best effort; view demo melakukan deduplikasi per run/event, bukan klaim exactly-once lintas sink.
+```powershell
+docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml --profile streaming run --rm market /workspace/jalankan.py replay-event --limit 40 --interval 2
+```
 
-Publikasi kode tidak memindahkan hak atas data pihak ketiga.
+Transformasi manual satu run memakai fungsi yang sama dengan task Airflow:
 
-## Sumber
+```powershell
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow python jalankan.py batch --task transform_spark --run-id SOURCE_RUN_ID
+```
 
-- [Web service BI JISDOR](https://www.bi.go.id/biwebservice/wskursbi.asmx?op=getSubKursJisdor3)
-- [Yahoo Finance JPM](https://finance.yahoo.com/quote/JPM/)
-- [Dokumentasi yfinance](https://ranaroussi.github.io/yfinance/)
-- Guideline lokal Final Project JCDEAH-009: memperbolehkan replay bila sumber streaming tidak tersedia; dokumen bootcamp tidak direpublikasikan.
+SOURCE_RUN_ID harus berasal dari pengambilan yang valid dan raw GCS sudah diunggah. Mode otomatis: DAG `jisdor_daily`, pukul 18.00 WIB selama container aktif dan DAG tidak paused. Cara menguji alert terdapat pada dokumentasi batch.
+
+## Dokumentasi
+
+- [Standar modul, error dan pengembangan](docs/standar_pengembangan.md)
+- [Batch manual dan otomatis](docs/bigquery_batch.md)
+- [Streaming dan bukti ingestion per event](docs/streaming_ingestion.md)
+- [Medallion, grain dan lineage](docs/medallion_bronze_silver_gold.md)
+- [Transformasi dan penggunaan mart](docs/demo_analytics.md)
+- [Definisi sinyal](docs/stock_signals.md)
+
+## Pengujian
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe -m ruff check .
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow python -m unittest discover -s tests -p test_spark_batch.py -v
+docker compose --env-file .env.airflow -f compose.yaml -f compose.analytics.yaml --profile analytics run --rm dbt build
+```
+
+Unit test lokal tidak memerlukan credential cloud. Test Spark berjalan di container; dbt build memerlukan akses BigQuery. Validasi meliputi kontrak event, hash raw, deduplikasi, jumlah load, kegagalan sink, rekonsiliasi dan penghentian task lanjutan saat error.
+
+## Akses hasil
+
+- [Airflow](http://localhost:8085), [Mailpit](http://localhost:8025), [dbt Docs](http://localhost:8086).
+- [BigQuery](https://console.cloud.google.com/bigquery?project=jcdeah-009), dataset `daud_finalproject` dan `daud_finalproject_demo`.
+- Dashboard HTML: `dashboard/index.html`, data dibuat ulang melalui pipeline.
+- Looker: hubungkan `mart_stock_monitoring` untuk histori dan `mart_stock_latest` untuk status terakhir. URL report belum disertakan.
+
+Credential, data lokal, hasil ekspor dan catatan presentasi tidak dipublikasikan. PostgreSQL adalah metadata Airflow; ingestion tabel bisnis PostgreSQL dan scraping HTML tidak termasuk implementasi saat ini. Dataflow tidak digunakan. Histori menit Yahoo memiliki batas ketersediaan; arsip lokal diperlukan untuk replay tanggal lama. Publikasi kode tidak memindahkan hak data pihak ketiga.
+
+Sumber: [BI JISDOR](https://www.bi.go.id/biwebservice/wskursbi.asmx?op=getSubKursJisdor3), [Yahoo Finance](https://finance.yahoo.com/), [yfinance](https://ranaroussi.github.io/yfinance/).

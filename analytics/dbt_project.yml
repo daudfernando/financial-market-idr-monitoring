@@ -8,4 +8,4 @@ models:
   daud_market:
     +materialized: view
 vars:
-  market_table: stg_market_events
+  market_table: stg_market_replay_demo

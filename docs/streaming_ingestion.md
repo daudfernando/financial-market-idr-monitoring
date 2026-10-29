@@ -22,13 +22,13 @@ Gunakan Windows PowerShell, Docker Desktop aktif, setup README sudah selesai, cr
 
 ```powershell
 Set-Location "C:\Purwadhika\Final Project"
-.\prepare_demo.cmd
+.\.venv\Scripts\python.exe jalankan.py siapkan-data
 ```
 
 Command ini memperbarui kandidat, menjalankan batch, dan membangun mart. Untuk hanya mengambil kandidat saham terbaru pada lingkungan yang sudah siap:
 
 ```powershell
-.\prepare_demo.cmd --stocks-only
+.\.venv\Scripts\python.exe jalankan.py siapkan-data --stocks-only
 ```
 
 Mode stocks-only belum mengubah BigQuery. Tanggal terakhir mengikuti data yang tersedia di sumber, bukan otomatis tanggal kalender hari ini.
@@ -36,7 +36,8 @@ Mode stocks-only belum mengubah BigQuery. Tanggal terakhir mengikuti data yang t
 ## 2. Jalankan replay, terminal pertama
 
 ```powershell
-.\run_streaming_demo.cmd --limit 40 --interval 2
+docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml --profile streaming up -d --wait kafka
+docker compose --env-file .env.airflow -f compose.yaml -f compose.streaming.yaml --profile streaming run --rm market /workspace/jalankan.py replay-event --limit 40 --interval 2
 ```
 
 Command menyalakan Kafka, membuat topic khusus run, lalu mengirim 40 bar terbaru. Interval 2 detik mengatur jeda producer; durasi total juga tergantung sink cloud. Producer dapat lebih cepat daripada consumer sehingga output KIRIM dan TERIMA tidak selalu bergantian.
@@ -56,13 +57,13 @@ Setelah minimal tiga pesan terkirim:
 
 ```powershell
 Set-Location "C:\Purwadhika\Final Project"
-.\show_kafka.cmd
+.\.venv\Scripts\python.exe jalankan.py lihat-kafka
 ```
 
 Output memperlihatkan topic, partition, serta tiga pesan dari broker beserta key dan offset. Ini pembaca terpisah, bukan membaca file lokal dan bukan mengirim ulang ke BigQuery. Default memilih topic incremental terbaru. Jika ada beberapa run, gunakan nama topic yang sesuai:
 
 ```powershell
-.\show_kafka.cmd --topic NAMA_TOPIC
+.\.venv\Scripts\python.exe jalankan.py lihat-kafka --topic NAMA_TOPIC
 ```
 
 ## 4. Lihat pertambahan data di BigQuery
@@ -110,16 +111,16 @@ Setiap run baru menambah data dengan demo_run_id berbeda. View mencegah duplikas
 Mode per pesan ini memakai tabel terpisah dan tidak otomatis memperbarui mart dashboard. Untuk memperbarui mart dari seluruh kandidat aktif:
 
 ```powershell
-.\run_demo.cmd
+.\.venv\Scripts\python.exe jalankan.py replay-lengkap
 ```
 
 Jalur snapshot lengkap: replay Kafka, validasi consumer, upload raw/valid ke GCS, load staging BigQuery, dbt build, ekspor dashboard, audit. Mart `mart_stock_monitoring` dan `mart_stock_latest` menjadi sumber dashboard. Lihat [transformasi dan mart analitik](demo_analytics.md).
 
 ## File implementasi
 
-- [Collector histori](../scripts/collect_market_universe.py), mengambil data sumber dan kandidat.
-- [Launcher per pesan](../run_streaming_demo.cmd), menjalankan layanan dan container.
-- [Pipeline per pesan](../streaming/incremental_demo.py), producer, consumer, GCS, insert dan rekonsiliasi.
-- [Kontrak event](../streaming/events.py), aturan validasi dan identitas event.
-- [Pembaca Kafka](../scripts/show_kafka.py), bukti pesan tersimpan di broker.
-- [Pipeline snapshot lengkap](../scripts/run_demo.py), publication hingga mart dashboard.
+- [Collector histori](../scripts/ekstraksi/ambil_histori_saham.py), mengambil data sumber dan kandidat.
+- [Entry point](../jalankan.py), memilih proses tanpa menduplikasi logika bisnis.
+- [Pipeline per pesan](../scripts/streaming/replay_per_event.py), producer, consumer, GCS, insert dan rekonsiliasi.
+- [Kontrak event](../scripts/streaming/kontrak_event.py), aturan validasi dan identitas event.
+- [Pembaca Kafka](../scripts/streaming/lihat_pesan_kafka.py), bukti pesan tersimpan di broker.
+- [Pipeline snapshot lengkap](../scripts/pipeline/jalankan_replay.py), publication hingga mart dashboard.

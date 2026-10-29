@@ -1,73 +1,61 @@
-# Batch JISDOR dari GCS ke BigQuery
+# Batch kurs, manual dan otomatis
 
-## Hasil tahap ini
+Alur: BI XML, raw GCS, Spark, processed GCS, staging BigQuery, MERGE fact, audit tanggal.
 
-- Project `jcdeah-009`.
-- Dataset `daud_finalproject`, region `asia-southeast2` agar sama dengan bucket.
-- Tabel `fact_jisdor_daily`, 14 record tanggal 20 Agustus sampai 9 September 2026.
-- Pemuatan awal memengaruhi 14 baris; rerun memengaruhi 0 baris.
-- Pemeriksaan akhir menemukan 0 duplikasi, 0 record invalid, dan 0 selisih terhadap batch sumber.
-
-Bukti eksekusi terdapat di `logs/bigquery_batch_20260909T220724849008Z.json` dan `logs/bigquery_batch_20260909T220750246691Z.json`. Log memuat job ID BigQuery, tabel staging, jumlah baris, dan hasil pemeriksaan.
-
-## Alur proses
-
-1. Baca manifest batch lengkap dari GCS.
-2. Unduh objek yang tercantum dan cocokkan ukuran serta SHA-256 dengan manifest.
-3. Periksa tipe tanggal, currency USD, rate positif, timezone timestamp, dan business key unik.
-4. Buat dataset serta tabel proyek jika belum tersedia. Schema atau region existing yang berbeda menyebabkan proses berhenti.
-5. Buat staging terpisah per eksekusi, dengan expiration satu hari, lalu muat record melalui BigQuery load job.
-6. Jalankan `sql/merge_jisdor.sql` berdasarkan `jisdor_date` dan `currency`.
-7. Periksa jumlah baris, duplikasi, nilai invalid, dan kesesuaian baris target dengan batch.
-
-Dataset dan tabel pada project lain tidak diubah. Credential dipilih melalui `--use-local-adc` tanpa mengganti environment credential komputer.
-
-## Schema dan alasan pemilihan
-
-| Kolom | Tipe BigQuery | Keterangan |
+| Task ID | Proses | Modul |
 |---|---|---|
-| jisdor_date | DATE, required | Tanggal referensi kurs; partition key |
-| currency | STRING, required | USD; clustering key |
-| usd_idr | NUMERIC, required | Kurs desimal, tanpa penyimpanan floating-point di warehouse |
-| source | STRING, required | Endpoint sumber |
-| ingested_at | TIMESTAMP, required | Waktu ingestion sumber, dipertahankan saat rerun |
-| fx_available_at | TIMESTAMP, nullable | Tetap null ketika waktu publikasi belum terverifikasi |
-| source_run_id | STRING, required | Run sumber GCS untuk keterlacakan |
+| collect | Ambil 45 hari terakhir | scripts/ekstraksi/ambil_kurs_bi.py |
+| upload_raw | Simpan XML sumber | scripts/pemuatan/simpan_kurs_gcs.py |
+| transform_spark | Cleaning dan validasi | scripts/transformasi/bersihkan_kurs_spark.py |
+| upload | Simpan processed dan manifest | scripts/pemuatan/simpan_kurs_gcs.py |
+| warehouse | Load, MERGE dan rekonsiliasi | scripts/pemuatan/muat_kurs_bigquery.py |
+| check_dates | Audit tanggal | scripts/validasi/periksa_tanggal_kurs.py |
 
-Grain tabel adalah satu tanggal referensi dan mata uang. Jika tanggal sudah ada, hanya record dengan ingestion sumber lebih baru yang memperbarui target. Rerun data identik tidak mengubah baris. Versi historis sumber tetap berada di GCS. Tabel fact ini menyimpan versi terbaru dan belum mencukupi kebutuhan historical as-of untuk revisi kurs; logika tersebut harus mempertimbangkan versi dan waktu ketersediaan sebelum mart exposure dibangun.
+Semua task memakai OperatorKurs dan `config/pipeline_kurs.yaml`. Manual dan otomatis memakai implementasi transformasi yang sama.
 
-Staging baru pada rerun bersifat sementara dan otomatis kedaluwarsa. Jaminan idempotensi tahap ini berlaku untuk hasil tabel fact pada eksekusi berurutan. Airflow nanti perlu membatasi run batch yang tumpang tindih. Query dibatasi `maximum_bytes_billed` 100 MiB per query untuk skala sampel ini.
-
-## Command yang digunakan
-
-Instalasi dependency dan pencatatan versi lingkungan.
+## Manual, PowerShell
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install google-cloud-bigquery
-.\.venv\Scripts\python.exe -m pip freeze | Set-Content -LiteralPath requirements.txt -Encoding UTF8
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow python jalankan.py batch
 ```
 
-Pengujian lokal.
+Satu tahap untuk sumber yang sudah ada:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow python jalankan.py batch --task transform_spark --run-id SOURCE_RUN_ID
 ```
 
-Pemuatan dan uji rerun memakai command yang sama dari root workspace.
+Raw harus sudah diunggah. Hasil Spark memeriksa hash sumber, tanggal, USD, kurs positif dan key unik; tidak mengimputasi tanggal hilang.
+
+## Otomatis, Airflow
+
+Buka [jisdor_daily](http://localhost:8085/dags/jisdor_daily), aktifkan DAG. Jadwal 18.00 WIB selama layanan aktif. Trigger manual scheduler:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\load_jisdor_bigquery.py --project jcdeah-009 --bucket jcdeah-009-daud-finalproject --run-id 20260909T214210877646Z --use-local-adc
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow airflow dags unpause jisdor_daily
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow airflow dags trigger jisdor_daily
 ```
 
-Script mencatat command sebelum bekerja, lalu menambahkan hasil dan lokasi report ke `logs/progress.txt`. Argumen script hanya berisi konfigurasi non-secret. Jika suatu proses gagal, exit code 1 dikembalikan dan error dicatat. Staging yang dibuat sebelum kegagalan tetap tersedia untuk diagnosis sampai expiration.
+## Uji error terkontrol
 
-## Batas implementasi
+```powershell
+$alertRunId = 'demo_fail_collect_' + (Get-Date -Format 'yyyyMMdd_HHmmss')
+docker compose --env-file .env.airflow -f compose.yaml exec -T airflow airflow dags trigger jisdor_daily --run-id $alertRunId
+```
 
-Tahap ini merupakan load batch dari processed GCS melalui Python menuju warehouse. PySpark, orkestrasi Airflow, alert eksternal, dbt, dan mart exposure belum dijalankan. Log lokal belum menggantikan alert kegagalan yang diminta guideline.
+Task collect sengaja gagal sebelum ekstraksi dan tanpa retry, hanya pada run manual dengan prefix ini. Buka [Mailpit](http://localhost:8025), cocokkan run ID pada email `[FAILED] jisdor_daily.collect`. Run normal tidak memakai prefix tersebut. Tidak diperlukan DAG error terpisah.
 
-Pemeriksaan integrasi memakai sampel nyata 14 record. Pengujian perubahan kurs revisi, concurrency, dan putus jaringan belum dilakukan. Dataset saham yang baru tersedia masih historis; belum ada event live JPM yang tervalidasi.
+## Hasil warehouse
 
-## Referensi
+[BigQuery fact JISDOR](https://console.cloud.google.com/bigquery?project=jcdeah-009&p=jcdeah-009&d=daud_finalproject&t=fact_jisdor_daily&page=table).
 
-- [BigQuery schema](https://docs.cloud.google.com/bigquery/docs/schemas).
-- [BigQuery MERGE](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax).
+```sql
+SELECT * FROM `jcdeah-009.daud_finalproject.fact_jisdor_daily`
+ORDER BY jisdor_date DESC LIMIT 10;
+
+SELECT jisdor_date, currency, COUNT(*) jumlah
+FROM `jcdeah-009.daud_finalproject.fact_jisdor_daily`
+GROUP BY 1, 2 HAVING COUNT(*) > 1;
+```
+
+Query duplikasi harus kosong. Input lebih baru memperbarui key yang sama; tanggal baru menambah baris. Staging kedaluwarsa setelah satu hari. Report teknis berada di logs/bigquery_batch_*.json; bukan progress.txt. Source run ID memakai UTC dan tidak sama dengan tanggal kurs.

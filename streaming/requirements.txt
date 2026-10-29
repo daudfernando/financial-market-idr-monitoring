@@ -1,3 +1,5 @@
-apache-beam[gcp]==2.67.0
 confluent-kafka==2.11.1
 yfinance==0.2.65
+google-cloud-bigquery==3.45.0
+google-cloud-storage==3.14.1
+PyYAML==6.0.2

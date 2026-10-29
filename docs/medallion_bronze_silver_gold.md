@@ -1,95 +1,42 @@
-# Medallion Architecture, Bronze, Silver, Gold
+# Medallion dan lineage data
 
-Nama pola pengorganisasian data proyek ini adalah **Medallion Architecture**: data dipisahkan menurut tingkat pengolahannya, dari raw, menjadi bersih, lalu siap analisis. Pemetaan ini bersifat logis terhadap pipeline yang sudah berjalan; bukan tiga dataset baru dan bukan implementasi Delta Lake.
+Medallion adalah pembagian layer pengolahan secara logis. Folder model dbt mengikuti Silver, dimensi dan Gold; raw Bronze tetap berada di GCS. Tidak ada klaim tiga dataset fisik atau star schema lengkap.
 
-Diagram layer: [bronze_silver_gold.svg](bronze_silver_gold.svg).
-
-## Bronze, raw dan bukti sumber
-
-Tujuan: menyimpan data asli agar dapat diaudit dan diproses ulang.
-
-| Data | Lokasi nyata | Grain |
+| Layer | Data | Grain dan key |
 |---|---|---|
-| XML JISDOR BI | GCS `gs://jcdeah-009-daud-finalproject/final-project/raw/jisdor/` | Satu respons API per run, berisi beberapa tanggal |
-| CSV saham hasil yfinance | Lokal `data/market_universe/<source_run_id>/*_as_returned.csv` | Satu bar harga per saham/menit sumber |
-| Pesan Kafka raw replay lengkap | GCS `final-project/demo/local-python/<run_id>/raw.jsonl` | Satu pesan dengan topic, partition, offset |
-| Pesan Kafka raw demo per pesan | GCS `final-project/demo/incremental/<run_id>/raw/` | Satu objek per pesan |
+| Bronze | XML BI, envelope Kafka dan sumber saham | Source run, topic/partition/offset |
+| Silver | fact_jisdor_daily, stg_prices, int_market_minutes | Tanggal+currency; event_id; saham/mode/jenis/menit |
+| Dimensi | dim_saham | Satu baris per symbol, referensi manual empat perusahaan |
+| Gold | fact_market_exposure, mart_market_risk, int_stock_features, mart_stock_monitoring, mart_stock_latest | Exposure per event; monitoring per saham/mode/jenis/menit; latest per saham/mode/jenis |
 
-XML/CSV asli tidak ditimpa untuk membuat tampilan bersih. File kandidat replay sudah merupakan hasil pemilihan kolom dan normalisasi waktu dari CSV, sehingga bukan salinan raw murni. Kafka adalah transport/log pesan, bukan nama layer penyimpanan tersendiri.
-
-## Silver, bersih, tervalidasi, terstandar
-
-Tujuan: menghasilkan data konsisten yang dapat digabungkan dan dihitung.
-
-| Relasi/hasil | Lokasi | Proses |
-|---|---|---|
-| JISDOR processed | GCS `final-project/processed/jisdor/` | Spark: parsing tanggal, TRIM/UPPER USD, cast kurs, validasi, output per tanggal |
-| `fact_jisdor_daily` | BigQuery `jcdeah-009.daud_finalproject` | MERGE; satu baris per `jisdor_date + currency` |
-| Replay valid | GCS `final-project/demo/local-python/<run_id>/valid.jsonl` | Python: harga, schema, waktu, identitas dan mode tervalidasi |
-| `stg_market_replay_demo` | BigQuery `jcdeah-009.daud_finalproject` | Staging tervalidasi; snapshot replay lengkap, sebelum deduplikasi dbt |
-| `stg_prices` | BigQuery `jcdeah-009.daud_finalproject_demo` | Deduplikasi `event_id` |
-| `int_market_minutes` | BigQuery `jcdeah-009.daud_finalproject_demo` | Satu saham/mode/tipe/menit; UTC, tanggal WIB, sesi New York |
-
-Kurs invalid atau key batch duplikat menggagalkan publikasi. Harga asli dipertahankan; gap tidak diisi angka buatan. Nama `fact_jisdor_daily` tidak otomatis menjadikannya Gold: pada pemetaan ini perannya adalah sumber kurs bersih bagi analitik.
-
-## Gold, analitik bisnis dan mart dashboard
-
-Tujuan: menyediakan jawaban atas perubahan harga, nilai rupiah, sinyal, dan perbandingan saham.
-
-Semua relasi berikut berada di BigQuery `jcdeah-009.daud_finalproject_demo`.
-
-| Model | Peran |
-|---|---|
-| `fact_market_exposure` | Model analitik antara: join harga-kurs sesuai waktu, valuasi satu saham dalam IDR |
-| `mart_market_risk` | Return, kontribusi harga/FX/interaksi, indikator pergerakan |
-| `int_stock_features` | Model fitur antara: SMA3/SMA8 dan return sesi |
-| `mart_stock_monitoring` | Mart utama: histori, sinyal simulasi, alasan, kualitas, dan pembanding |
-| `mart_stock_latest` | Mart ringkasan: satu observasi sumber terbaru per saham/mode/tipe |
-
-Grain mart monitoring: satu `symbol + ingestion_mode + record_type + minute_utc`.
-Looker Studio membaca `mart_stock_monitoring` dan `mart_stock_latest`.
-
-## Diagram hubungan
+`int_stock_features` berada di folder Silver sebagai transformasi fitur yang digunakan Gold; dependensinya tetap mengikuti ref(), bukan nama folder. Layer tidak mengubah urutan SQL yang diperlukan.
 
 ```mermaid
 flowchart LR
-  subgraph Bronze[BRONZE - raw]
-    BI[XML asli BI di GCS]
-    Y[CSV asli saham lokal]
-    K[Pesan Kafka raw di GCS]
-    Y --> K
-  end
-  subgraph Silver[SILVER - bersih dan standar]
-    FX[fact_jisdor_daily]
-    ST[stg_market_replay_demo]
-    D[stg_prices]
-    M[int_market_minutes]
-    ST --> D --> M
-  end
-  subgraph Gold[GOLD - analitik bisnis]
-    E[fact_market_exposure]
-    R[mart_market_risk]
-    F[int_stock_features]
-    H[mart_stock_monitoring]
-    L[mart_stock_latest]
-    E --> R --> F --> H --> L
-  end
-  BI -->|Spark + load/MERGE| FX
-  K -->|validasi Python + load| ST
-  FX --> E
-  M --> E
-  H --> LOOKER[Looker Studio]
-  L --> LOOKER
+  R[Raw GCS Bronze] --> FX[fact_jisdor_daily]
+  R --> ST[stg_market_replay_demo]
+  ST --> P[stg_prices]
+  DIM[dim_saham] --> MIN[int_market_minutes]
+  P --> MIN
+  MIN --> F[fact_market_exposure]
+  FX --> F
+  F --> RISK[mart_market_risk]
+  RISK --> FT[int_stock_features]
+  FT --> M[mart_stock_monitoring]
+  M --> LAST[mart_stock_latest]
+  M --> L[Looker histori]
+  LAST --> L
 ```
 
-Diagram menyederhanakan orkestrasi dan transport; data processed GCS terdapat di antara Spark/Python dan warehouse.
+## Mengapa dbt
 
-## Posisi demo tambahan
+Model SQL, dependency `ref()`/`source()`, test dan dokumentasi berada dalam satu project yang bisa direview dan dijalankan ulang. dbt menentukan urutan pembangunan dari graph, bukan urutan script manual. BigQuery tetap menjadi mesin eksekusi SQL; dbt bukan penyimpanan baru.
 
-- Tabel `daud_finalproject.demo_streaming_events` adalah staging tervalidasi demo per pesan. View bernama sama pada dataset demo melakukan deduplikasi per `demo_run_id + event_id`. Keduanya setara fungsi Silver, tetapi **bukan input mart Gold utama** saat ini.
-- `demo_signal_scenarios` adalah fixture sintetis pengujian, bukan data pasar Bronze/Silver/Gold.
-- `jisdor_date_coverage` adalah view audit tanggal, bukan dimensi bisnis baru.
+Dimensi manual menjelaskan symbol dan company_name. Harga per menit terhubung ke dim_saham berdasarkan symbol dan currency. Exposure memilih kurs USD terakhir yang tersedia pada waktu observasi. Jika waktu publikasi kurs tidak diketahui, gunakan tanggal kurs sebelum event WIB. LEFT JOIN mempertahankan harga tanpa kurs agar missing FX terdeteksi, bukan hilang diam-diam.
 
-## Jenis pemodelan
+## Batasan
 
-Medallion adalah **arsitektur lapisan pengolahan**, bukan nama skema relasional. Proyek ini memakai analytical marts dengan grain yang jelas; belum merupakan star schema lengkap karena belum memiliki tabel dimensi terpisah seperti `dim_stock` atau `dim_date`.
+- Demo per-event memakai tabel/view demo_streaming_events dan bukan input mart utama.
+- demo_signal_scenarios hanya fixture sintetis pengujian, tidak bercampur dengan data pasar.
+- View jisdor_date_coverage adalah audit, bukan dimensi kalender bisnis.
+- Nama model warehouse tetap sama; perpindahan folder tidak memerlukan perubahan koneksi Looker.
